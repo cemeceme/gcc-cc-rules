@@ -1,11 +1,4 @@
 
-[please]
-version = >=17.12.7-depHandling
-
-[PluginDefinition]
-name = cc
-
-
 def _buildTUCommand(name:str):
     """
     Generates the command for a translation unit as a pre-build call.

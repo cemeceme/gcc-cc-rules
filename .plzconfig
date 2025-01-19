@@ -3,6 +3,9 @@
 [please]
 version = >=17.12.7
 
+[Plugin "cc"]
+Target = //plugins:cc
+
 [PluginDefinition]
 name = gcc
 
