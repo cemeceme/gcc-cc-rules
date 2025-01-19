@@ -122,7 +122,7 @@ def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[],
 
     # Tool definitions.
     tools = {
-        "cc": [CONFIG.CC.CPP_TOOL],
+        "cc": [CONFIG.GCC.CPP_TOOL],
     }
 
     srcRule = build_rule(
@@ -168,7 +168,7 @@ def link(name:str, out:str, deps:list=[], sharedLib:bool, labels:list=[]):
 
     # Tool definitions.
     tools = {
-        "ld": [CONFIG.CC.LD_TOOL]
+        "ld": [CONFIG.GCC.LD_TOOL]
     }
 
     requires = ["cc", "test"]
