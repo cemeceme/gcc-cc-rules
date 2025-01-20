@@ -6,8 +6,20 @@ def _getBuildTUCommand(c:bool):
         """
         labels = get_labels(name, "")
 
+        # Get default flags.
+        defaultFlags = []
+        std = ""
+        if(c):
+            std = "c99" # C standard to use.
+            defaultFlags += CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" ")
+        else:
+            std = "c++20" # C++ standard to use.
+            defaultFlags += CONFIG.GCC.DEFAULT_OPT_CPPFLAGS.split(" ")
+
+        # Parse labels.
         defines = []
         includes = []
+        warnings = []
         for label in labels:
             if(not label.startswith("cc:")):
                 continue # Skip labels not meant for cc rules.
@@ -21,37 +33,38 @@ def _getBuildTUCommand(c:bool):
 
             if(remaining.startswith("def:")):
                 defines += [remaining[4:]]
-
-        # Get default flags.
-        std = ""
-        defaultFlags = ""
-        flags = []
-        if(c):
-            std = "c99" # C standard to use.
-            defaultFlags = CONFIG.GCC.DEFAULT_OPT_CFLAGS
-        else:
-            std = "c++20" # C++ standard to use.
-            defaultFlags = CONFIG.GCC.DEFAULT_OPT_CPPFLAGS
+            
+            if(remaining.startswith("cf:")):
+                defaultFlags += [remaining[3:]]
 
         # Parse default flags.
-        for flag in defaultFlags.split(" "):
+        flags = []
+        for flag in defaultFlags:
             strippedFlag = flag.lstrip("-")
             if(strippedFlag.startswith("std=")):
                 std = strippedFlag[4:]
                 continue
+
             if(strippedFlag.startswith("I")):
                 include += [strippedFlag[1:]]
                 continue
+
             if(strippedFlag.startswith("D")):
                 defines += [strippedFlag[1:]]
                 continue
+            
+            if(strippedFlag.startswith("W")):
+                warnings += [strippedFlag[1:]]
+                continue
+
             flags += [flag]
 
 
         # Set up command.
         cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
 
-        cmd += ["-I."] # Include paths.
+        # Include paths.
+        cmd += ["-I."] 
         for include in includes:
             cmd += ["-I" + include]
 
@@ -59,14 +72,22 @@ def _getBuildTUCommand(c:bool):
         for define in defines:
             cmd += ["-D" + define]
 
-        cmd += ["${SRCS_SRCS}"] # Source files.
+        # Source files.
+        cmd += ["${SRCS_SRCS}"]
+
+        # Standard. 
         cmd += ["--std=" + std]
 
-        # Error flags.
+        # Error/warning flags.
+        for warning in warnings:
+            cmd += ["-W" + warning]
+
         # cmd += [
         #     "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
         #     "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
         # ]
+        
+        # Other flags.
         cmd += flags
         # cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
         # cmd += ["-fPIC"] # Position independent code.
