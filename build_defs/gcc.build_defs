@@ -22,6 +22,32 @@ def _getBuildTUCommand(c:bool):
             if(remaining.startswith("def:")):
                 defines += [remaining[4:]]
 
+        # Get default flags.
+        std = ""
+        defaultFlags = ""
+        flags = []
+        if(c):
+            std = "c99" # C standard to use.
+            defaultFlags = CONFIG.GCC.DEFAULT_OPT_CFLAGS
+        else:
+            std = "c++20" # C++ standard to use.
+            defaultFlags = CONFIG.GCC.DEFAULT_OPT_CPPFLAGS
+
+        # Parse default flags.
+        for flag in defaultFlags.split(" "):
+            strippedFlag = flag.lstrip("-")
+            if(strippedFlag.startswith("std=")):
+                std = strippedFlag[4:]
+                continue
+            if(strippedFlag.startswith("I")):
+                include += [strippedFlag[1:]]
+                continue
+            if(strippedFlag.startswith("D")):
+                defines += [strippedFlag[1:]]
+                continue
+            flags += [flag]
+
+
         # Set up command.
         cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
 
@@ -34,19 +60,16 @@ def _getBuildTUCommand(c:bool):
             cmd += ["-D" + define]
 
         cmd += ["${SRCS_SRCS}"] # Source files.
-        if(c):
-            cmd += ["--std=c99"] # C standard to use.
-        else:
-            cmd += ["--std=c++20"] # C++ standard to use.
-
+        cmd += ["--std=" + std]
 
         # Error flags.
-        cmd += [
-            "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
-            "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
-        ]
-        cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
-        cmd += ["-fPIC"] # Position independent code.
+        # cmd += [
+        #     "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
+        #     "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
+        # ]
+        cmd += flags
+        # cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
+        # cmd += ["-fPIC"] # Position independent code.
         # cmd += ["-isystem", "."] # System Include paths.
 
         set_command(name, "opt", " ".join(cmd))
