@@ -66,7 +66,8 @@ def _getBuildTUCommand(c:bool):
         # Include paths.
         cmd += ["-I."] 
         for include in includes:
-            cmd += ["-I" + include]
+            # cmd += ["-I" + include]
+            cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.E if this is a subrepo, use isystem)
 
         # Defines.
         for define in defines:
@@ -82,15 +83,9 @@ def _getBuildTUCommand(c:bool):
         for warning in warnings:
             cmd += ["-W" + warning]
 
-        # cmd += [
-        #     "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
-        #     "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
-        # ]
-        
         # Other flags.
         cmd += flags
-        # cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
-        # cmd += ["-fPIC"] # Position independent code.
+        cmd += ["-fPIC"] # Position independent code.
         # cmd += ["-isystem", "."] # System Include paths.
 
         set_command(name, "opt", " ".join(cmd))
@@ -162,7 +157,7 @@ def _getBuildLinkCommand(sharedLib:bool):
         if(len(flags) > 0):
             cmd += [",".join(["-Wl"] + flags)]
 
-        cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimizations, thread support and max errors.
+        cmd += ["-lpthread", "-fPIC", "-O3", "-fmax-errors=5"] # Optimizations, thread support and max errors.
 
         set_command(name, "opt", " ".join(cmd))
 
