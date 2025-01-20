@@ -1,50 +1,56 @@
 
-def _buildTUCommand(name:str):
-    """
-    Generates the command for a translation unit as a pre-build call.
-    """
-    labels = get_labels(name, "")
+def _getBuildTUCommand(c:bool):
+    def _buildTUCommand(name:str):
+        """
+        Generates the command for a translation unit as a pre-build call.
+        """
+        labels = get_labels(name, "")
 
-    defines = []
-    includes = []
-    for label in labels:
-        if(not label.startswith("cc:")):
-            continue # Skip labels not meant for cc rules.
+        defines = []
+        includes = []
+        for label in labels:
+            if(not label.startswith("cc:")):
+                continue # Skip labels not meant for cc rules.
 
-        # Strip prefix.
-        remaining = label[3:]
+            # Strip prefix.
+            remaining = label[3:]
 
-        # Add label to corresponding list.
-        if(remaining.startswith("inc:")):
-            includes += [remaining[4:]]
+            # Add label to corresponding list.
+            if(remaining.startswith("inc:")):
+                includes += [remaining[4:]]
 
-        if(remaining.startswith("def:")):
-            defines += [remaining[4:]]
+            if(remaining.startswith("def:")):
+                defines += [remaining[4:]]
 
-    # Set up command.
-    cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
+        # Set up command.
+        cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
 
-    cmd += ["-I."] # Include paths.
-    for include in includes:
-        cmd += ["-I" + include]
+        cmd += ["-I."] # Include paths.
+        for include in includes:
+            cmd += ["-I" + include]
 
-    # Defines.
-    for define in defines:
-        cmd += ["-D" + define]
+        # Defines.
+        for define in defines:
+            cmd += ["-D" + define]
 
-    cmd += ["${SRCS_SRCS}"] # Source files.
-    cmd += ["-std=c++20"] # C++ standard to use.
+        cmd += ["${SRCS_SRCS}"] # Source files.
+        if(c):
+            cmd += ["--std=c99"] # C standard to use.
+        else:
+            cmd += ["--std=c++20"] # C++ standard to use.
 
-    # Error flags.
-    cmd += [
-        "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
-        "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
-    ]
-    cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
-    cmd += ["-fPIC"] # Position independent code.
-    # cmd += ["-isystem", "."] # System Include paths.
 
-    set_command(name, "opt", " ".join(cmd))
+        # Error flags.
+        cmd += [
+            "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
+            "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
+        ]
+        cmd += ["-lpthread", "-O3", "-fmax-errors=5"] # Optimisations, thread support and max errors.
+        cmd += ["-fPIC"] # Position independent code.
+        # cmd += ["-isystem", "."] # System Include paths.
+
+        set_command(name, "opt", " ".join(cmd))
+    return(_buildTUCommand)
 
 def _getBuildLinkCommand(sharedLib:bool):
     def _buildLinkCommand(name:str):
@@ -118,35 +124,42 @@ def _getBuildLinkCommand(sharedLib:bool):
 
     return(_buildLinkCommand)
 
-def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[], labels:list=[]):
+def getTranslationUnit(c:bool):
 
     # Tool definitions.
-    tools = {
-        "cc": [CONFIG.GCC.CPP_TOOL],
-    }
+    tools = {}
 
-    srcRule = build_rule(
-        name=name,
-        outs=[out],
-        optional_outs=['*.gcno'],
-        deps=deps,
-        srcs={'srcs': [src], 'hdrs': hdrs},
-        cmd="",
-        pre_build=_buildTUCommand,
-        building_description='Compiling... ',
-        binary=False,
-        needs_transitive_deps=True,
-        requires=["cc_hdrs", "test"],
-        labels=labels,
-        tools=tools
-    )
-    return(srcRule)
+    # Select correct tool depending on if this is for C or C++
+    if(c):
+        tools["cc"] = CONFIG.GCC.CC_TOOL
+    else:
+        tools["cc"] = CONFIG.GCC.CPP_TOOL
+
+    def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[], labels:list=[]):
+
+        srcRule = build_rule(
+            name=name,
+            outs=[out],
+            optional_outs=['*.gcno'],
+            deps=deps,
+            srcs={'srcs': [src], 'hdrs': hdrs},
+            cmd="",
+            pre_build=_getBuildTUCommand(c),
+            building_description='Compiling... ',
+            binary=False,
+            needs_transitive_deps=True,
+            requires=["cc_hdrs", "test"],
+            labels=labels,
+            tools=tools
+        )
+        return(srcRule)
+    return(translationUnit)
 
 def archive(name: str, out:str, srcs:list, deps:list):
 
     # Tool definitions.
     tools = {
-        "ar": ["ar"],
+        "ar": [CONFIG.GCC.AR_TOOL],
     }
 
     archiveRule = build_rule(
