@@ -97,21 +97,12 @@ def _getBuildLinkCommand(sharedLib:bool):
         Generates the command for a link step as a pre-build call.
         """
 
-        # Binary
-        # $TOOLS_CC" -o "$OUT" -Wl,--start-group `find . -name "*.o" -or -name "*.a" | sort` -Wl,--end-group 
-        # -Wl,-L.,-lnodeGraph -Wl,-LnodeGraphRenderers/qtWidgetRenderer,-lqtWidgetRenderer -Wl,-lmysql-connector-cpp -Wl,-rpath,'$ORIGIN/subrepos/nodeGraph' -Wl,-rpath,'$ORIGIN/subrepos/nodeGraph/nodeGraphRenderers/qtWidgetRenderer' -Wl,-rpath,'$ORIGIN/subrepos/mysql-connector-cpp' -Wl,-lpthread,-ldl -Wl,--build-id=none -std=c++20 -Werror -Werror=suggest-override -Werror=return-type -Werror=non-virtual-dtor -Werror=catch-value -Wno-unused-variable -Wno-reorder -Wno-sign-compare -Wno-stringop-overflow -lpthread -s -O3 -fmax-errors=5  -Wl,-lpthread,-ldl 
-        # -Wl,/usr/lib64/libQt6Charts.so -Wl,/usr/lib64/libQt6Core.so -Wl,/usr/lib64/libQt6Gui.so -Wl,/usr/lib64/libQt6Widgets.so
-
-        # Shared object.
-        # "$TOOLS_CC" -o "$OUT" -shared -Wl,--whole-archive -Wl,--start-group `find . -name "*.o" -or -name "*.a" | sort` -Wl,--end-group -Wl,--no-whole-archive 
-        # -Wl,-lpthread,-ldl -Wl,--build-id=none -std=c++20 -Werror -Werror=suggest-override -Werror=return-type -Werror=non-virtual-dtor -Werror=catch-value -Wno-unused-variable -Wno-reorder -Wno-sign-compare -Wno-stringop-overflow -lpthread -s -O3 -fmax-errors=5  -Wl,-lpthread,-ldl
-
-
         labels = get_labels(name, "")
 
         includes = []
         libraries = []
         flags = []
+        alwaysLink = []
         for label in labels:
             if(not label.startswith("cc:")):
                 continue # Skip labels not meant for cc rules.
@@ -129,13 +120,29 @@ def _getBuildLinkCommand(sharedLib:bool):
             if(remaining.startswith("ld:")):
                 flags += [remaining[3:].replace(" ", ",")]
 
+            if(remaining.startswith("al:")):
+                alwaysLink += [remaining[3:]]
+
+        # Objects/archives to link.
+        # It may also be interesting to actually recognize the objects to link, which would allow for deduplication with alwaysLink options.
+        linkObjects = ["`find . -name \"*.o\" -or -name \"*.a\" | sort`"]
+        alwaysLinkObjects = alwaysLink
+
         cmd = ["$TOOLS_LD", "-o", "\"$OUT\""]
         if(sharedLib):
-            cmd += ["-shared", "-Wl,--whole-archive"]
-        cmd += ["-Wl,--start-group", "`find . -name \"*.o\" -or -name \"*.a\" | sort`", "-Wl,--end-group"]
-        if(sharedLib):
-            cmd += ["-Wl,--no-whole-archive"]
-
+            # Always link all inputs for shared libraries.
+            alwaysLinkObjects = linkObjects
+            linkObjects = []
+            cmd += ["--shared"]
+        
+        # Add always link objects if any.
+        if(len(alwaysLinkObjects) > 0):
+            cmd += ["-Wl,--whole-archive"] + alwaysLinkObjects + ["-Wl,--no-whole-archive"]
+        
+        # Add normal link objects, if any.
+        if(len(linkObjects) > 0):
+            cmd += ["-Wl,--start-group"] + linkObjects + ["-Wl,--end-group"]
+            
 
         # Add library paths.
         includeCmd = []
@@ -144,16 +151,11 @@ def _getBuildLinkCommand(sharedLib:bool):
             includeCmd += ["-L" + directory, "-l" + fileName]
 
         if(len(includeCmd) > 0):
-            cmd += [",".join(["-Wl"]+ includeCmd)] # Include paths.
+            cmd += [",".join(["-Wl"] + includeCmd)] # Include paths.
 
-        # cmd += ["-std=c++20"] # C++ standard to use.
         cmd += ["-Wl,--build-id=none"] # Disable build ID.
 
-        # Error flags.
-        # cmd += [
-        #     "-Werror", "-Werror=suggest-override", "-Werror=return-type", "-Werror=non-virtual-dtor", "-Werror=catch-value", "-Wno-unused-variable", 
-        #     "-Wno-reorder", "-Wno-sign-compare", "-Wno-stringop-overflow"
-        # ]
+        # Linker flags.
         if(len(flags) > 0):
             cmd += [",".join(["-Wl"] + flags)]
 
