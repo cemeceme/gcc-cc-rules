@@ -1,10 +1,26 @@
 
+def _parseLabelValues(prefixes:list, labels:list) -> dict:
+    """
+    Parses the given list of label strings and creates a dict of all label values that match the given list of prefixes.
+    The output dict always contains all prefixes, but will only have an empty list value if there where no labels with that label prefix.
+    """
+    # Generate output dict.
+    res = {}
+    for prefix in prefixes:
+        res[prefix] = []
+
+    # Populate with values.
+    for label in labels:
+        for prefix in prefixes:
+            if(label.startswith(prefix)):
+                res[prefix] += [label[len(prefix):]]
+    return(res)
+
 def _getBuildTUCommand(c:bool):
     def _buildTUCommand(name:str):
         """
         Generates the command for a translation unit as a pre-build call.
         """
-        labels = get_labels(name, "")
 
         # Get default flags.
         defaultFlags = []
@@ -17,26 +33,15 @@ def _getBuildTUCommand(c:bool):
             defaultFlags += CONFIG.GCC.DEFAULT_OPT_CPPFLAGS.split(" ")
 
         # Parse labels.
-        defines = []
-        includes = []
+        labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], get_labels(name, ""))
+        defines = labels["cc:def:"]
+        includes = labels["cc:inc:"]
         warnings = []
-        for label in labels:
-            if(not label.startswith("cc:")):
-                continue # Skip labels not meant for cc rules.
+        pkgConfigFlags = labels["cc:pc:"]
+        pkgConfigLibs = labels["cc:pcc:"]
+        defaultFlags += labels["cc:cf:"]
 
-            # Strip prefix.
-            remaining = label[3:]
-
-            # Add label to corresponding list.
-            if(remaining.startswith("inc:")):
-                includes += [remaining[4:]]
-
-            if(remaining.startswith("def:")):
-                defines += [remaining[4:]]
             
-            if(remaining.startswith("cf:")):
-                defaultFlags += [remaining[3:]]
-
         # Parse default flags.
         flags = []
         for flag in defaultFlags:
@@ -88,6 +93,10 @@ def _getBuildTUCommand(c:bool):
         cmd += ["-fPIC"] # Position independent code.
         # cmd += ["-isystem", "."] # System Include paths.
 
+        # Add pkg-config command if specified.
+        if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
+            cmd += ["`", "pkg-config", "--cflags"] + pkgConfigFlags + pkgConfigLibs + ["`"]
+
         set_command(name, "opt", " ".join(cmd))
     return(_buildTUCommand)
 
@@ -97,31 +106,13 @@ def _getBuildLinkCommand(sharedLib:bool):
         Generates the command for a link step as a pre-build call.
         """
 
-        labels = get_labels(name, "")
-
-        includes = []
-        libraries = []
-        flags = []
-        alwaysLink = []
-        for label in labels:
-            if(not label.startswith("cc:")):
-                continue # Skip labels not meant for cc rules.
-
-            # Strip prefix.
-            remaining = label[3:]
-
-            # Add label to corresponding list.
-            if(remaining.startswith("inc:")):
-                includes += [remaining[4:]]
-            
-            if(remaining.startswith("lib:")):
-                libraries += [remaining[4:]]
-            
-            if(remaining.startswith("ld:")):
-                flags += [remaining[3:].replace(" ", ",")]
-
-            if(remaining.startswith("al:")):
-                alwaysLink += [remaining[3:]]
+        # Parse labels.
+        labels = _parseLabelValues(["cc:inc:", "cc:lib:", "cc:ld:", "cc:al:", "cc:pcc:"], get_labels(name, ""))
+        includes = labels["cc:inc:"]
+        libraries = labels["cc:lib:"]
+        flags = [flag.replace(" ", ",") for flag in labels["cc:ld:"]]
+        alwaysLink = labels["cc:al:"]
+        pkgConfigLibs = labels["cc:pcc:"]
 
         # Objects/archives to link.
         # It may also be interesting to actually recognize the objects to link, which would allow for deduplication with alwaysLink options.
@@ -137,12 +128,15 @@ def _getBuildLinkCommand(sharedLib:bool):
         
         # Add always link objects if any.
         if(len(alwaysLinkObjects) > 0):
-            cmd += ["-Wl,--whole-archive"] + alwaysLinkObjects + ["-Wl,--no-whole-archive"]
+            objectsCmd += ["-Wl,--whole-archive"] + alwaysLinkObjects + ["-Wl,--no-whole-archive"]
         
         # Add normal link objects, if any.
         if(len(linkObjects) > 0):
-            cmd += ["-Wl,--start-group"] + linkObjects + ["-Wl,--end-group"]
-            
+            objectsCmd += linkObjects
+
+        if(len(objectsCmd) > 0):
+            # Wrap all link objects within a group and add to cmd.
+            cmd += ["-Wl,--start-group"] + objectsCmd + ["-Wl,--end-group"]
 
         # Add library paths.
         includeCmd = []
@@ -160,6 +154,10 @@ def _getBuildLinkCommand(sharedLib:bool):
             cmd += [",".join(["-Wl"] + flags)]
 
         cmd += ["-lpthread", "-fPIC", "-O3", "-fmax-errors=5"] # Optimizations, thread support and max errors.
+
+        # Add pkg-config command if specified.
+        if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
+            cmd += ["`", "pkg-config", "--libs"] + pkgConfigLibs + ["`"]
 
         set_command(name, "opt", " ".join(cmd))
 
