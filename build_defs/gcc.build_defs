@@ -37,8 +37,8 @@ def _getBuildTUCommand(c:bool):
         defines = labels["cc:def:"]
         includes = labels["cc:inc:"]
         warnings = []
-        pkgConfigFlags = labels["cc:pc:"]
-        pkgConfigLibs = labels["cc:pcc:"]
+        pkgConfigLibs = labels["cc:pc:"]
+        pkgConfigFlags = labels["cc:pcc:"]
         defaultFlags += labels["cc:cf:"]
 
             
@@ -107,12 +107,12 @@ def _getBuildLinkCommand(sharedLib:bool):
         """
 
         # Parse labels.
-        labels = _parseLabelValues(["cc:inc:", "cc:lib:", "cc:ld:", "cc:al:", "cc:pcc:"], get_labels(name, ""))
+        labels = _parseLabelValues(["cc:inc:", "cc:lib:", "cc:ld:", "cc:al:", "cc:pc:"], get_labels(name, ""))
         includes = labels["cc:inc:"]
         libraries = labels["cc:lib:"]
         flags = [flag.replace(" ", ",") for flag in labels["cc:ld:"]]
         alwaysLink = labels["cc:al:"]
-        pkgConfigLibs = labels["cc:pcc:"]
+        pkgConfigLibs = labels["cc:pc:"]
 
         # Objects/archives to link.
         # It may also be interesting to actually recognize the objects to link, which would allow for deduplication with alwaysLink options.
