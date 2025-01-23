@@ -126,6 +126,7 @@ def _getBuildLinkCommand(sharedLib:bool):
             linkObjects = []
             cmd += ["--shared"]
         
+        objectsCmd = []
         # Add always link objects if any.
         if(len(alwaysLinkObjects) > 0):
             objectsCmd += ["-Wl,--whole-archive"] + alwaysLinkObjects + ["-Wl,--no-whole-archive"]
@@ -156,7 +157,7 @@ def _getBuildLinkCommand(sharedLib:bool):
         cmd += ["-lpthread", "-fPIC", "-O3", "-fmax-errors=5"] # Optimizations, thread support and max errors.
 
         # Add pkg-config command if specified.
-        if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
+        if(len(pkgConfigLibs) > 0):
             cmd += ["`", "pkg-config", "--libs"] + pkgConfigLibs + ["`"]
 
         set_command(name, "opt", " ".join(cmd))
