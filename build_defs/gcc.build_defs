@@ -51,7 +51,7 @@ def _getBuildTUCommand(c:bool):
                 continue
 
             if(strippedFlag.startswith("I")):
-                include += [strippedFlag[1:]]
+                includes += [strippedFlag[1:]]
                 continue
 
             if(strippedFlag.startswith("D")):
@@ -64,15 +64,14 @@ def _getBuildTUCommand(c:bool):
 
             flags += [flag]
 
-
         # Set up command.
         cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
 
         # Include paths.
-        cmd += ["-I."] 
+        cmd += ["-I."]
         for include in includes:
+            cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.e. if this is an include from a subrepo, use isystem)
             # cmd += ["-I" + include]
-            cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.E if this is a subrepo, use isystem)
 
         # Defines.
         for define in defines:
@@ -91,7 +90,6 @@ def _getBuildTUCommand(c:bool):
         # Other flags.
         cmd += flags
         cmd += ["-fPIC"] # Position independent code.
-        # cmd += ["-isystem", "."] # System Include paths.
 
         # Add pkg-config command if specified.
         if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
@@ -154,7 +152,7 @@ def _getBuildLinkCommand(sharedLib:bool):
         if(len(flags) > 0):
             cmd += [",".join(["-Wl"] + flags)]
 
-        cmd += ["-lpthread", "-fPIC", "-O3", "-fmax-errors=5"] # Optimizations, thread support and max errors.
+        cmd += CONFIG.GCC.DEFAULT_LDFLAGS.split(" ")
 
         # Add pkg-config command if specified.
         if(len(pkgConfigLibs) > 0):

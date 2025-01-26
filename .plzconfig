@@ -73,7 +73,7 @@ Help = The default c++ compiler flags when compiling for debug
 
 [PluginConfig "default_ldflags"]
 ConfigKey = DefaultLdFlags
-DefaultValue = -lpthread -ldl
+DefaultValue = -lpthread -ldl -fPIC
 Inherit = true
 Help = The default set of flags to apply when linking 
 
