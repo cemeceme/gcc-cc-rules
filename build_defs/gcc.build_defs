@@ -105,7 +105,7 @@ def _getBuildLinkCommand(sharedLib:bool):
         """
 
         # Parse labels.
-        labels = _parseLabelValues(["cc:inc:", "cc:lib:", "cc:ld:", "cc:al:", "cc:pc:"], get_labels(name, ""))
+        labels = _parseLabelValues(["cc:inc:", "cc:lib:", "cc:ld:", "cc:al:", "cc:pc:"], get_labels(name, "", True))
         includes = labels["cc:inc:"]
         libraries = labels["cc:lib:"]
         flags = [flag.replace(" ", ",") for flag in labels["cc:ld:"]]
@@ -141,6 +141,8 @@ def _getBuildLinkCommand(sharedLib:bool):
         includeCmd = []
         for library in libraries:
             directory, fileName = split_path(library)
+            if(len(directory) == 0):
+                directory = "." # replace empty directory paths with '.'.
             includeCmd += ["-L" + directory, "-l" + fileName]
 
         if(len(includeCmd) > 0):
