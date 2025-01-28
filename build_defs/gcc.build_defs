@@ -16,93 +16,85 @@ def _parseLabelValues(prefixes:list, labels:list) -> dict:
                 res[prefix] += [label[len(prefix):]]
     return(res)
 
-def _getBuildTUCommand(c:bool):
-    def _buildTUCommand(name:str):
-        """
-        Generates the command for a translation unit as a pre-build call.
-        """
 
-        def _buildTUConfig(defaultFlags: list, c:bool) -> list:
-            
-            # Get default flags.
-            std = ""
-            if(c):
-                std = "c99" # C standard to use.
-            else:
-                std = "c++20" # C++ standard to use.
+def _buildTUCommand(labels:list, prefixPath:str, defaultFlags:list, c:bool) -> str:
+    """
+    Generates the command string for a translation unit.
+    """
 
-            # Parse labels.
-            labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], get_labels(name, ""))
-            defines = labels["cc:def:"]
-            includes = labels["cc:inc:"]
-            warnings = []
-            pkgConfigLibs = labels["cc:pc:"]
-            pkgConfigFlags = labels["cc:pcc:"]
-            defaultFlags += labels["cc:cf:"]
+    # Get default flags.
+    std = ""
+    if(c):
+        std = "c99" # C standard to use.
+    else:
+        std = "c++20" # C++ standard to use.
 
-                
-            # Parse default flags.
-            flags = []
-            for flag in defaultFlags:
-                strippedFlag = flag.lstrip("-")
-                if(strippedFlag.startswith("std=")):
-                    std = strippedFlag[4:]
-                    continue
+    # Parse labels.
+    labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], labels)
+    defines = labels["cc:def:"]
+    includes = labels["cc:inc:"]
+    warnings = []
+    pkgConfigLibs = labels["cc:pc:"]
+    pkgConfigFlags = labels["cc:pcc:"]
+    defaultFlags += labels["cc:cf:"]
 
-                if(strippedFlag.startswith("I")):
-                    includes += [strippedFlag[1:]]
-                    continue
-
-                if(strippedFlag.startswith("D")):
-                    defines += [strippedFlag[1:]]
-                    continue
-                
-                if(strippedFlag.startswith("W")):
-                    warnings += [strippedFlag[1:]]
-                    continue
-
-                flags += [flag]
-
-            # Set up command.
-            cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
-
-            # Include paths.
-            cmd += ["-I."]
-            for include in includes:
-                cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.e. if this is an include from a subrepo, use isystem)
-                # cmd += ["-I" + include]
-
-            # Defines.
-            for define in defines:
-                cmd += ["-D" + define]
-
-            # Source files.
-            cmd += ["${SRCS_SRCS}"]
-
-            # Standard. 
-            cmd += ["--std=" + std]
-
-            # Error/warning flags.
-            for warning in warnings:
-                cmd += ["-W" + warning]
-
-            # Other flags.
-            cmd += flags
-            cmd += ["-fPIC"] # Position independent code.
-
-            # Add pkg-config command if specified.
-            if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
-                cmd += ["`", "pkg-config", "--cflags"] + pkgConfigFlags + pkgConfigLibs + ["`"]
-            
-            # Re-write file prefix to be relative to the project root.
-            cmd += ["-ffile-prefix-map=$(pwd)=" + join_path(subrepo_name(), get_base_path())]
-            return(cmd)
         
-        # Generate and set debug and optimized commands.
-        set_command(name, "opt", " ".join(_buildTUConfig(CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), c)))
-        set_command(name, "dbg", " ".join(_buildTUConfig(CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), c)))
+    # Parse default flags.
+    flags = []
+    for flag in defaultFlags:
+        strippedFlag = flag.lstrip("-")
+        if(strippedFlag.startswith("std=")):
+            std = strippedFlag[4:]
+            continue
 
-    return(_buildTUCommand)
+        if(strippedFlag.startswith("I")):
+            includes += [strippedFlag[1:]]
+            continue
+
+        if(strippedFlag.startswith("D")):
+            defines += [strippedFlag[1:]]
+            continue
+        
+        if(strippedFlag.startswith("W")):
+            warnings += [strippedFlag[1:]]
+            continue
+
+        flags += [flag]
+
+    # Set up command.
+    cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
+
+    # Include paths.
+    cmd += ["-I."]
+    for include in includes:
+        cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.e. if this is an include from a subrepo, use isystem)
+        # cmd += ["-I" + include]
+
+    # Defines.
+    for define in defines:
+        cmd += ["-D" + define]
+
+    # Source files.
+    cmd += ["${SRCS_SRCS}"]
+
+    # Standard. 
+    cmd += ["--std=" + std]
+
+    # Error/warning flags.
+    for warning in warnings:
+        cmd += ["-W" + warning]
+
+    # Other flags.
+    cmd += flags
+    cmd += ["-fPIC"] # Position independent code.
+
+    # Add pkg-config command if specified.
+    if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
+        cmd += ["`", "pkg-config", "--cflags"] + pkgConfigFlags + pkgConfigLibs + ["`"]
+    
+    # Re-write file prefix to be relative to the project root.
+    cmd += ["-ffile-prefix-map=$(pwd)=" + prefixPath]
+    return(" ".join(cmd))
 
 def _getBuildLinkCommand(sharedLib:bool):
     def _buildLinkCommand(name:str):
@@ -165,10 +157,23 @@ def _getBuildLinkCommand(sharedLib:bool):
             cmd += ["`", "pkg-config", "--libs"] + pkgConfigLibs + ["`"]
 
         set_command(name, "opt", " ".join(cmd))
+        set_command(name, "dbg", " ".join(cmd))
 
     return(_buildLinkCommand)
 
 def getTranslationUnit(c:bool):
+
+    def _TUCommand(name:str):
+        """
+        Generates the command for a translation unit as a pre-build call.
+        """
+
+        labels = get_labels(name, "")
+        prefixPath = join_path(subrepo_name(), get_base_path())
+        
+        # Generate and set debug and optimized commands.
+        set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), c))
+        set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), c))
 
     # Tool definitions.
     tools = {}
@@ -188,7 +193,7 @@ def getTranslationUnit(c:bool):
             deps=deps,
             srcs={'srcs': [src], 'hdrs': hdrs},
             cmd="",
-            pre_build=_getBuildTUCommand(c),
+            pre_build=_TUCommand,
             building_description='Compiling... ',
             binary=False,
             needs_transitive_deps=True,
