@@ -173,9 +173,17 @@ def getTranslationUnit(lang:str):
         labels = get_labels(name, "")
         prefixPath = join_path(subrepo_name(), get_base_path())
         
-        # Generate and set debug and optimized commands.
-        set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), lang))
-        set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), lang))
+        if(lang == "c"):
+            # Generate and set debug and optimized commands.
+            set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), lang))
+            set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), lang))
+        elif(lang == "c++"):
+            # Generate and set debug and optimized commands.
+            set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CPPFLAGS.split(" "), lang))
+            set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CPPFLAGS.split(" "), lang))
+        else:
+            log.fatal("Unknown language: " + lang)
+            
 
     # Tool definitions.
     tools = {}
