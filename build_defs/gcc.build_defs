@@ -17,17 +17,19 @@ def _parseLabelValues(prefixes:list, labels:list) -> dict:
     return(res)
 
 
-def _buildTUCommand(labels:list, prefixPath:str, defaultFlags:list, c:bool) -> str:
+def _buildTUCommand(labels:list, prefixPath:str, defaultFlags:list, lang:str) -> str:
     """
     Generates the command string for a translation unit.
     """
 
     # Get default flags.
     std = ""
-    if(c):
+    if(lang == "c"):
         std = "c99" # C standard to use.
-    else:
+    elif(lang == "c++"):
         std = "c++20" # C++ standard to use.
+    else:
+        log.fatal("Unknown language: " + lang)
 
     # Parse labels.
     labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], labels)
@@ -161,7 +163,7 @@ def _getBuildLinkCommand(sharedLib:bool):
 
     return(_buildLinkCommand)
 
-def getTranslationUnit(c:bool):
+def getTranslationUnit(lang:str):
 
     def _TUCommand(name:str):
         """
@@ -172,17 +174,19 @@ def getTranslationUnit(c:bool):
         prefixPath = join_path(subrepo_name(), get_base_path())
         
         # Generate and set debug and optimized commands.
-        set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), c))
-        set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), c))
+        set_command(name, "opt", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), lang))
+        set_command(name, "dbg", _buildTUCommand(labels, prefixPath, CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), lang))
 
     # Tool definitions.
     tools = {}
 
     # Select correct tool depending on if this is for C or C++
-    if(c):
+    if(lang == "c"):
         tools["cc"] = CONFIG.GCC.CC_TOOL
-    else:
+    elif(lang == "c++"):
         tools["cc"] = CONFIG.GCC.CPP_TOOL
+    else:
+        log.fatal("Unknown language: " + lang)
 
     def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[], labels:list=[]):
 

@@ -10,7 +10,7 @@ filegroup(
 compilerPlugin(
     name="gcc",
     include="///gcc//build_defs:gcc_file",
-    compiler="getTranslationUnit(True)",
+    compiler="getTranslationUnit(\"c\")",
     archiver="archive",
     linker="link"
 )
@@ -18,7 +18,7 @@ compilerPlugin(
 compilerPlugin(
     name="gpp",
     include="///gcc//build_defs:gcc_file",
-    compiler="getTranslationUnit(False)",
+    compiler="getTranslationUnit(\"c++\")",
     archiver="archive",
     linker="link"
 )
