@@ -22,80 +22,86 @@ def _getBuildTUCommand(c:bool):
         Generates the command for a translation unit as a pre-build call.
         """
 
-        # Get default flags.
-        defaultFlags = []
-        std = ""
-        if(c):
-            std = "c99" # C standard to use.
-            defaultFlags += CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" ")
-        else:
-            std = "c++20" # C++ standard to use.
-            defaultFlags += CONFIG.GCC.DEFAULT_OPT_CPPFLAGS.split(" ")
-
-        # Parse labels.
-        labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], get_labels(name, ""))
-        defines = labels["cc:def:"]
-        includes = labels["cc:inc:"]
-        warnings = []
-        pkgConfigLibs = labels["cc:pc:"]
-        pkgConfigFlags = labels["cc:pcc:"]
-        defaultFlags += labels["cc:cf:"]
-
+        def _buildTUConfig(defaultFlags: list, c:bool) -> list:
             
-        # Parse default flags.
-        flags = []
-        for flag in defaultFlags:
-            strippedFlag = flag.lstrip("-")
-            if(strippedFlag.startswith("std=")):
-                std = strippedFlag[4:]
-                continue
+            # Get default flags.
+            std = ""
+            if(c):
+                std = "c99" # C standard to use.
+            else:
+                std = "c++20" # C++ standard to use.
 
-            if(strippedFlag.startswith("I")):
-                includes += [strippedFlag[1:]]
-                continue
+            # Parse labels.
+            labels = _parseLabelValues(["cc:inc:", "cc:def:", "cc:cf:", "cc:pc:", "cc:pcc:"], get_labels(name, ""))
+            defines = labels["cc:def:"]
+            includes = labels["cc:inc:"]
+            warnings = []
+            pkgConfigLibs = labels["cc:pc:"]
+            pkgConfigFlags = labels["cc:pcc:"]
+            defaultFlags += labels["cc:cf:"]
 
-            if(strippedFlag.startswith("D")):
-                defines += [strippedFlag[1:]]
-                continue
+                
+            # Parse default flags.
+            flags = []
+            for flag in defaultFlags:
+                strippedFlag = flag.lstrip("-")
+                if(strippedFlag.startswith("std=")):
+                    std = strippedFlag[4:]
+                    continue
+
+                if(strippedFlag.startswith("I")):
+                    includes += [strippedFlag[1:]]
+                    continue
+
+                if(strippedFlag.startswith("D")):
+                    defines += [strippedFlag[1:]]
+                    continue
+                
+                if(strippedFlag.startswith("W")):
+                    warnings += [strippedFlag[1:]]
+                    continue
+
+                flags += [flag]
+
+            # Set up command.
+            cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
+
+            # Include paths.
+            cmd += ["-I."]
+            for include in includes:
+                cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.e. if this is an include from a subrepo, use isystem)
+                # cmd += ["-I" + include]
+
+            # Defines.
+            for define in defines:
+                cmd += ["-D" + define]
+
+            # Source files.
+            cmd += ["${SRCS_SRCS}"]
+
+            # Standard. 
+            cmd += ["--std=" + std]
+
+            # Error/warning flags.
+            for warning in warnings:
+                cmd += ["-W" + warning]
+
+            # Other flags.
+            cmd += flags
+            cmd += ["-fPIC"] # Position independent code.
+
+            # Add pkg-config command if specified.
+            if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
+                cmd += ["`", "pkg-config", "--cflags"] + pkgConfigFlags + pkgConfigLibs + ["`"]
             
-            if(strippedFlag.startswith("W")):
-                warnings += [strippedFlag[1:]]
-                continue
+            # Re-write file prefix to be relative to the project root.
+            cmd += ["-ffile-prefix-map=$(pwd)=" + join_path(subrepo_name(), get_base_path())]
+            return(cmd)
+        
+        # Generate and set debug and optimized commands.
+        set_command(name, "opt", " ".join(_buildTUConfig(CONFIG.GCC.DEFAULT_OPT_CFLAGS.split(" "), c)))
+        set_command(name, "dbg", " ".join(_buildTUConfig(CONFIG.GCC.DEFAULT_DBG_CFLAGS.split(" "), c)))
 
-            flags += [flag]
-
-        # Set up command.
-        cmd = ["\"$TOOLS_CC\"", "-c", "-o", "\"$OUT\""] # Gcc in compile only mode. TODO is "-s" needed?
-
-        # Include paths.
-        cmd += ["-I."]
-        for include in includes:
-            cmd += ["-isystem" + include] # TODO figure out how to dynamically select if isystem or I should be used (I.e. if this is an include from a subrepo, use isystem)
-            # cmd += ["-I" + include]
-
-        # Defines.
-        for define in defines:
-            cmd += ["-D" + define]
-
-        # Source files.
-        cmd += ["${SRCS_SRCS}"]
-
-        # Standard. 
-        cmd += ["--std=" + std]
-
-        # Error/warning flags.
-        for warning in warnings:
-            cmd += ["-W" + warning]
-
-        # Other flags.
-        cmd += flags
-        cmd += ["-fPIC"] # Position independent code.
-
-        # Add pkg-config command if specified.
-        if(len(pkgConfigFlags) > 0 or len(pkgConfigLibs) > 0):
-            cmd += ["`", "pkg-config", "--cflags"] + pkgConfigFlags + pkgConfigLibs + ["`"]
-
-        set_command(name, "opt", " ".join(cmd))
     return(_buildTUCommand)
 
 def _getBuildLinkCommand(sharedLib:bool):
