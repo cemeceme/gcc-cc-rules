@@ -143,7 +143,7 @@ def _getBuildLinkCommand(sharedLib:bool):
             directory, fileName = split_path(library)
             if(len(directory) == 0):
                 directory = "." # replace empty directory paths with '.'.
-            includeCmd += ["-L" + directory, "-l" + fileName]
+            includeCmd += ["-L" + directory, "-l" + fileName] # TODO deduplicate directories and fileNames.
 
         if(len(includeCmd) > 0):
             cmd += [",".join(["-Wl"] + includeCmd)] # Include paths.
@@ -198,7 +198,7 @@ def getTranslationUnit(lang:str):
     else:
         log.fatal("Unknown language: " + lang)
 
-    def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[], labels:list=[]):
+    def translationUnit(name:str, src:str, out:str=None, hdrs:list=[], deps:list=[], labels:list=[], test_only:bool&testonly = False):
 
         srcRule = build_rule(
             name=name,
@@ -213,12 +213,13 @@ def getTranslationUnit(lang:str):
             needs_transitive_deps=True,
             requires=["cc_hdrs", "test"],
             labels=labels,
-            tools=tools
+            tools=tools,
+            test_only=test_only
         )
         return(srcRule)
     return(translationUnit)
 
-def archive(name: str, out:str, srcs:list, deps:list):
+def archive(name: str, out:str, srcs:list, deps:list, test_only:bool&testonly = False):
 
     # Tool definitions.
     tools = {
@@ -234,12 +235,13 @@ def archive(name: str, out:str, srcs:list, deps:list):
         binary=True,
         deps=deps,
         tools = tools,
-        output_is_complete=False
+        output_is_complete=False,
+        test_only=test_only
     )
 
     return(archiveRule)
 
-def link(name:str, out:str, deps:list=[], sharedLib:bool, labels:list=[]):
+def link(name:str, out:str, deps:list=[], sharedLib:bool, labels:list=[], test_only:bool&testonly = False):
     pass
 
     # Tool definitions.
@@ -263,5 +265,6 @@ def link(name:str, out:str, deps:list=[], sharedLib:bool, labels:list=[]):
         requires=requires,
         labels=labels,
         tools=tools,
+        test_only=test_only
     )
     return(linkRule)
